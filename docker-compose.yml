@@ -1,0 +1,68 @@
+# Docker Compose Configuration for Video Search Platform
+# 
+# This configuration runs all services:
+# - API Gateway (port 5000)
+# - Search Microservice (port 5001)
+# - Frontend (port 3000)
+
+version: '3.8'
+
+services:
+  # Search Microservice
+  search-microservice:
+    build:
+      context: ./search-microservice
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - SERVICE_TOKEN=service-secret-token-change-in-production
+      - DATABASE_URL=sqlite:///search_jobs.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - SEARCH_MICROSERVICE_URL=http://search-microservice:5001
+      - SERVICE_TOKEN=service-secret-token-change-in-production
+      - DATABASE_URL=sqlite:///videos.db
+      - JWT_SECRET=your-jwt-secret-change-in-production
+    depends_on:
+      - search-microservice
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend
+
+  # Frontend
+  frontend:
+    build:
+      context: ./starter-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+    depends_on:
+      - api-gateway
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
